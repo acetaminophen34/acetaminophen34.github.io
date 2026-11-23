@@ -960,27 +960,90 @@
         high: [
           "上司「いいね」。そのあと特に何も起きなかった。平和である。",
           "芸術と実用が両立している。こんな配置、なかなか見ない。褒め言葉である。",
-          "形がきれいに決まっている。上司は写真を撮った。たぶん社内報行きである。"
+          "形がきれいに決まっている。上司は写真を撮った。たぶん社内報行きである。",
+          "上司が一周して戻ってきた。「……いいね」。二度見である。褒め言葉として受け取ってよい。",
+          "「来週の会議もこの形で」。上司の一言で、この配置は来週も生き延びることになった。",
+          "誰も文句を言わないどころか、他部署の人が見に来た。ちょっとした名所である。"
         ],
         mid: [
           "悪くない。ただ、誰も良くも悪くも何も言わない。そういう配置である。",
           "上司はうなずいた。意味は分からないが、うなずいた。それで十分な日もある。",
-          "くっついているところと、そうでないところがある。人生のようだ、と誰かが言った。"
+          "くっついているところと、そうでないところがある。人生のようだ、と誰かが言った。",
+          "上司は首をかしげて、最後にうなずいた。判定には時間がかかるタイプの配置である。",
+          "悪くはない。でも「あと一歩」が口癖の上司は、今日もあと一歩と言った。"
         ],
         low: [
           "上司は黙って一台だけ直して帰った。何も言わなかったのが一番こわい。",
           "芸術としては攻めている。会場としては、攻めすぎている。",
-          "机同士がケンカしているように見える。仲裁が必要である。"
+          "机同士がケンカしているように見える。仲裁が必要である。",
+          "上司は腕を組んだまま、ゆっくり一周して帰った。コメントはなかった。空気がすべてを語っている。",
+          "「とりあえず座れるからいいか」。その「とりあえず」が一番の低評価である。"
         ],
-        out: ["まず、机が部屋からはみ出している。そこからである。"],
-        over: ["机が重なっている。物理的に無理がある配置は、上司も見逃してくれない。"],
+        out: [
+          "まず、机が部屋からはみ出している。そこからである。",
+          "はみ出した机の分だけ、廊下の人の迷惑になっている。まず中に入れるところからである。",
+          "部屋の中に収まっていない机がある。会場は部屋の中だけである。"
+        ],
+        over: [
+          "机が重なっている。物理的に無理がある配置は、上司も見逃してくれない。",
+          "重なった机同士が場所を取り合っている。まず離してやるところからである。",
+          "机の上に机が乗っているように見える。そういう家具ではない。"
+        ],
         mono: [
           "きれいに整列している。でもそれは「並べた」だけである。形はまだ生まれていない。",
           "全台同じ向き、間隔も均等。整いすぎて、工夫の居場所がない配置である。",
           "倉庫の在庫みたいに並んでいる。くっつけて形を作るところから始まる。"
+        ],
+        joined: [
+          "全台がひとつの形になっている。上司はしばらく眺めて「作品じゃん」と言った。褒め言葉である。",
+          "全部つながった大きな形を見て、上司が黙って写真を撮った。説明不要、という顔である。",
+          "ひとつの塊としての完成度が高い。「このまま動かすなよ」。上司の本気の指示である。"
+        ],
+        artAhead: [
+          "芸術点は高い。でも上司は「で、人はどこに座るの」と聞いた。攻めた配置の宿命である。",
+          "形としては見事である。実用のほうは、上司の表情がまだ追いついていない。",
+          "「アートとしては分かる」。上司のこの一言は、褒め言葉のようで、保留でもある。"
+        ],
+        bossAhead: [
+          "上司ウケは抜群である。ただ芸術のほうは、まだ「きちんと並んだ机」の域を出ていない。",
+          "実用一点張りの配置。上司は満足そうだが、形の面白さはこれからである。",
+          "「仕事はしやすそうだね」。上司は喜んだ。芸術担当としては、少し悔しい評価である。"
+        ],
+        varied: [
+          "角度の使い方がにぎやかで、形に動きがある。上司も「なんか楽しそうだね」と言った。",
+          "いろんな向きの机が噛み合っている。ごちゃごちゃではなく、意図がある並びである。",
+          "斜めの接合が効いている。まっすぐだけでは出ない表情が出ている。"
+        ],
+        sym: [
+          "左右のバランスが取れた形になっている。見た目の落ち着きが、上司の安心感につながっている。",
+          "対称っぽい形の美しさがある。整っているのに、ただの整列とは違う。",
+          "形のバランスがよく、上司が「なんか落ち着くね」と言った。配置の狙い通りである。"
         ]
       };
-      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+      /* 講評は袋から重複なしで引く：同じ講評が続けて出ることはなく、
+         袋が空になるまではその種類の講評が一巡する。前回と同じ文が
+         袋の最初に来たときは入れ替えて、連続表示を避ける。 */
+      var commentBags = {};
+      var lastComment = "";
+      function pick(key) {
+        var arr = COMMENTS[key];
+        if (!arr || !arr.length) return "";
+        var bag = commentBags[key];
+        if (!bag || !bag.length) {
+          bag = arr.slice();
+          for (var i = bag.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+          }
+          if (bag.length > 1 && bag[bag.length - 1] === lastComment) {
+            var t2 = bag[bag.length - 1]; bag[bag.length - 1] = bag[0]; bag[0] = t2;
+          }
+          commentBags[key] = bag;
+        }
+        var c = bag.pop();
+        lastComment = c;
+        return c;
+      }
 
       function showResult() {
         var r = score();
@@ -990,12 +1053,17 @@
         for (var i = 0; i < TITLES.length; i++) if (r.total >= TITLES[i][0]) { title = TITLES[i][1]; break; }
         document.getElementById("rTitle").textContent = "称号：「" + title + "」";
         var comment;
-        if (r.out >= 3) comment = pick(COMMENTS.out);
-        else if (r.over >= 3) comment = pick(COMMENTS.over);
-        else if (r.monotony) comment = pick(COMMENTS.mono);
-        else if (r.total >= 68) comment = pick(COMMENTS.high);
-        else if (r.total >= 44) comment = pick(COMMENTS.mid);
-        else comment = pick(COMMENTS.low);
+        if (r.out >= 3) comment = pick("out");
+        else if (r.over >= 3) comment = pick("over");
+        else if (r.monotony) comment = pick("mono");
+        else if (r.largest >= desks.length && r.joins >= desks.length - 1) comment = pick("joined");
+        else if (r.art - r.boss >= 25) comment = pick("artAhead");
+        else if (r.boss - r.art >= 25) comment = pick("bossAhead");
+        else if (r.joinVariety >= 4) comment = pick("varied");
+        else if (r.sym >= 0.85 && r.largest >= 3) comment = pick("sym");
+        else if (r.total >= 68) comment = pick("high");
+        else if (r.total >= 44) comment = pick("mid");
+        else comment = pick("low");
         document.getElementById("rComment").textContent = comment;
         document.getElementById("rStats").textContent =
           "くっつき " + r.joins + " 組 ／ 一番大きな形 " + r.largest + " 台 ／ 形の角度 " + r.joinVariety + " 種類 ／ 対称っぽさ " + Math.round(r.sym * 100) + "% ／ 小物 いい場所 " + r.propGood + "／" + r.propTotal + " 個 ／ はみ出し " + r.out + " 台 ／ 重なり " + r.over + " 組";
