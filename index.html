@@ -239,6 +239,7 @@
         回転ボタンは長押しすると15°ずつ回り続けるので、連打しなくてよい。回す量を30°・60°に変えることもできる。
         辺と辺がぴったり合うと「カチッ」とくっついて、一緒に動かせるようになる。
         台形2台を斜辺で合わせると平行四辺形、長辺で合わせると六角形になる。それがこのゲームのキモである。
+        芸術点は「きれいに整列」では伸びない。ただ単調に並べただけの配置は、むしろ低く出る。くっつけて形を作り、その中で角度に変化をつけ、部屋の空間を使うほど伸びる。上司ウケも、整っているだけより「形ができている」ほうが高くなる。
       </p>
 
       <footer>
@@ -789,10 +790,15 @@
         return true;
       }
 
-      /* ===== 採点（ゆるめ） =====
-         基本点は厚めに。くっつき・対称・角度のバラエティは全部ボーナス扱い。
-         対称は重心まわりも含めてゆるく見て、近さに応じた部分点を出す。
-         最後に「雰囲気」のランダム分を少し足して、点数に幅が出るようにする。 */
+      /* ===== 採点 =====
+         芸術点は「整列のきれいさ」ではなく「形の面白さ・工夫」を見る。
+         基礎点は薄くし、くっつけて形を作った分（連結・一番大きな形・
+         形の中の角度の変化・斜めに曲がった接合）が大きく効くようにする。
+         対称は「形ができているときだけ」効く：中心がそろっただけの
+         グリッド整列では対称ボーナスはほぼ出ない。
+         全部同じ向きで1台もくっついていない配置は「単調」として減点。
+         上司ウケは整い具合も見るが、基礎点を下げて整列だけでは
+         高得点にならないようにした。 */
       function score() {
         var st = STAGES[stageIdx];
         var n = Math.max(1, desks.length);
@@ -861,9 +867,41 @@
         var insideRatio = (n - outCount) / n;
         var facingRatio = (st.decor === "screen" || st.decor === "board") ? facing / n : neat / n;
 
+        /* --- 形のでき具合（芸術点の主役） --- */
+        // 連結したまとまり（一番大きな形がどれだけ大きいか）
+        var seenComp = {}, compSizes = [];
+        desks.forEach(function (d) {
+          if (seenComp[d.id]) return;
+          var comp = componentOf(d);
+          comp.forEach(function (m) { seenComp[m.id] = true; });
+          compSizes.push(comp.length);
+        });
+        var largest = compSizes.length ? Math.max.apply(null, compSizes) : 0;
+        var compRatio = largest / n;
+        // くっついている机同士の角度の種類（形の中の変化）
+        var pairList = joinPairs();
+        var joinedIds = {};
+        pairList.forEach(function (pr) { joinedIds[pr[0].id] = true; joinedIds[pr[1].id] = true; });
+        var jAngs = {};
+        desks.forEach(function (d) { if (joinedIds[d.id]) jAngs[((d.a % 180) + 180) % 180] = true; });
+        var joinVariety = Object.keys(jAngs).length;
+        // 斜めに曲がってくっついた組の割合（直線だけより形が面白くなる）
+        var turned = 0;
+        pairList.forEach(function (pr) { if (Math.abs(normAng(pr[0].a - pr[1].a)) > 4) turned++; });
+        var turnRatio = joins ? turned / joins : 0;
+        // 空間の使い方：机の広がりが部屋のどれくらいを占めるか（隅の固まりは低め）
+        var mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+        desks.forEach(function (d) {
+          if (d.x < mnx) mnx = d.x; if (d.x > mxx) mxx = d.x;
+          if (d.y < mny) mny = d.y; if (d.y > mxy) mxy = d.y;
+        });
+        var spread = Math.min(1, ((mxx - mnx + 128) * (mxy - mny + 56)) / (ROOM.w * ROOM.h) * 1.6);
+        // 単調な整列：全部同じ向きで、1台もくっついていない
+        var monotony = (variety <= 1 && joins === 0);
+
         /* --- 雰囲気分（毎回ちょっとだけブレて幅が出る） --- */
-        var vibeArt = Math.random() * 9;
-        var vibeBoss = Math.random() * 9;
+        var vibeArt = Math.random() * 4;
+        var vibeBoss = Math.random() * 4;
 
         /* --- 小物の置き場所（ゆる判定：だいたい合っていれば加点） --- */
         var propGood = 0;
@@ -876,31 +914,37 @@
           } else if (nearWall) propGood++; /* 植木とバーは壁際・隅が無難 */
         });
 
-        var art = 36
-          + joinRatio * 20
-          + sym * 18
-          + Math.min(10, variety * 2)
-          + groupRatio * 8
-          + propGood * 3
+        /* 芸術点：形を作った工夫が主役。整列・対称だけでは伸びない */
+        var art = 6
+          + joinRatio * 26
+          + compRatio * 20
+          + Math.min(12, Math.max(0, joinVariety - 1) * 4)
+          + turnRatio * 10
+          + sym * (2 + 6 * compRatio)
+          + spread * 5
+          + propGood * 1.5
           + vibeArt
-          - outCount * 3
-          - overPairs * 4;
-
-        var boss = 40
-          + insideRatio * 14
-          + facingRatio * 14
-          + (neat / n) * 8
-          + joinRatio * 8
-          + sym * 6
-          + propGood * 2
-          + vibeBoss
           - outCount * 4
-          - overPairs * 5;
+          - overPairs * 6;
+        if (monotony) art -= 6;
 
-        art = Math.round(Math.max(12, Math.min(98, art)));
-        boss = Math.round(Math.max(12, Math.min(98, boss)));
+        /* 上司ウケ：整い具合は見るが基礎は薄め。形ができていると伸びる */
+        var boss = 16
+          + insideRatio * 11
+          + facingRatio * 10
+          + (neat / n) * 5
+          + joinRatio * 10
+          + compRatio * 6
+          + sym * 4
+          + propGood * 1.5
+          + vibeBoss
+          - outCount * 5
+          - overPairs * 6;
+
+        art = Math.round(Math.max(4, Math.min(97, art)));
+        boss = Math.round(Math.max(6, Math.min(97, boss)));
         var total = Math.round(art * 0.5 + boss * 0.5);
-        return { art: art, boss: boss, total: total, joins: joins, sym: sym, out: outCount, over: overPairs, propGood: propGood, propTotal: props.length };
+        return { art: art, boss: boss, total: total, joins: joins, sym: sym, out: outCount, over: overPairs, propGood: propGood, propTotal: props.length, largest: largest, joinVariety: joinVariety, monotony: monotony };
       }
 
       var TITLES = [
@@ -929,7 +973,12 @@
           "机同士がケンカしているように見える。仲裁が必要である。"
         ],
         out: ["まず、机が部屋からはみ出している。そこからである。"],
-        over: ["机が重なっている。物理的に無理がある配置は、上司も見逃してくれない。"]
+        over: ["机が重なっている。物理的に無理がある配置は、上司も見逃してくれない。"],
+        mono: [
+          "きれいに整列している。でもそれは「並べた」だけである。形はまだ生まれていない。",
+          "全台同じ向き、間隔も均等。整いすぎて、工夫の居場所がない配置である。",
+          "倉庫の在庫みたいに並んでいる。くっつけて形を作るところから始まる。"
+        ]
       };
       function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -943,12 +992,13 @@
         var comment;
         if (r.out >= 3) comment = pick(COMMENTS.out);
         else if (r.over >= 3) comment = pick(COMMENTS.over);
+        else if (r.monotony) comment = pick(COMMENTS.mono);
         else if (r.total >= 68) comment = pick(COMMENTS.high);
         else if (r.total >= 44) comment = pick(COMMENTS.mid);
         else comment = pick(COMMENTS.low);
         document.getElementById("rComment").textContent = comment;
         document.getElementById("rStats").textContent =
-          "くっつき " + r.joins + " 組 ／ 対称っぽさ " + Math.round(r.sym * 100) + "% ／ 小物 いい場所 " + r.propGood + "／" + r.propTotal + " 個 ／ はみ出し " + r.out + " 台 ／ 重なり " + r.over + " 組";
+          "くっつき " + r.joins + " 組 ／ 一番大きな形 " + r.largest + " 台 ／ 形の角度 " + r.joinVariety + " 種類 ／ 対称っぽさ " + Math.round(r.sym * 100) + "% ／ 小物 いい場所 " + r.propGood + "／" + r.propTotal + " 個 ／ はみ出し " + r.out + " 台 ／ 重なり " + r.over + " 組";
         document.getElementById("result").classList.add("show");
         /* 結果を見るときは操作バーを畳んで、盤面を画面内に入れる */
         document.getElementById("controls").classList.add("collapsed");
